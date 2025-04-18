@@ -15,7 +15,7 @@ import {
 } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
  
-const TestsList = () => {
+const OnclassHomePageTeacher = () => {
   const navigate = useNavigate();
  
   // States
@@ -537,5 +537,5 @@ const TestsList = () => {
   );
 };
  
-export default TestsList;
+export default OnclassHomePageTeacher;
  
