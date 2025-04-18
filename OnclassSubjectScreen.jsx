@@ -1,25 +1,24 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "./OnclassSubjectScreen.css";
-import { FaBook, FaBell, FaHeadset, FaCog, FaPlus, FaSignOutAlt, FaTimes, FaEllipsisV, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaBook, FaBell, FaHeadset, FaCog, FaSignOutAlt, FaTimes, FaEllipsisV, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 
-
-const OnclassSubjectScreen   = () => {
+const OnclassSubjectScreen = () => {
   const navigate = useNavigate();
   // State để điều khiển hiển thị thông báo
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Thêm state cho dữ liệu bảng
+  // State cho dữ liệu bảng
   const [tests, setTests] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearchActive, setIsSearchActive] = useState(false);
   
-  // Sử dụng cùng pageSize với API
+  // Dùng cùng pageSize với API
   const pageSize = 10;
   
   // Toggle hiển thị hộp thông báo
@@ -31,32 +30,21 @@ const OnclassSubjectScreen   = () => {
   const fetchTests = async (pageNumber = 1) => {
     setIsLoading(true);
     try {
-      // Sử dụng đúng URL API với tham số phân trang
       const response = await axios.get(`http://localhost:5026/api/Quiz/PageNumber?pageNumber=${pageNumber}&pageSize=${pageSize}`);
       console.log("API Quiz response:", response.data);
       
       if (response.data) {
-        // Sử dụng quizzes thay vì tests để phản ánh cấu trúc API thực tế
         setTests(response.data.quizzes || []);
-        
-        // Tính toán tổng số trang từ totalCount và pageSize
         const calculatedTotalPages = Math.ceil(response.data.totalCount / pageSize);
         setTotalPages(calculatedTotalPages || 1);
         setCurrentPage(response.data.pageNumber || 1);
-        
-        // Lưu dữ liệu vào localStorage để có thể tìm kiếm offline
         localStorage.setItem("tests", JSON.stringify(response.data.quizzes || []));
         localStorage.setItem("totalTests", response.data.totalCount);
-        // Lưu dữ liệu phân trang
         localStorage.setItem(`tests_page_${pageNumber}`, JSON.stringify(response.data.quizzes || []));
-        
-        // Reset trạng thái tìm kiếm
         setIsSearchActive(false);
       }
     } catch (error) {
       console.error("Lỗi khi lấy dữ liệu bài kiểm tra:", error);
-      
-      // Nếu không kết nối được với API, thử lấy dữ liệu từ localStorage
       const cachedTests = localStorage.getItem("tests");
       if (cachedTests) {
         setTests(JSON.parse(cachedTests));
@@ -78,7 +66,6 @@ const OnclassSubjectScreen   = () => {
       localStorage.setItem("notifications", JSON.stringify(notificationData));
     } catch (error) {
       console.error("Lỗi khi lấy dữ liệu thông báo:", error);
-      // Sử dụng dữ liệu từ localStorage nếu có
       const cachedNotifications = localStorage.getItem("notifications");
       if (cachedNotifications) {
         setNotifications(JSON.parse(cachedNotifications));
@@ -98,22 +85,14 @@ const OnclassSubjectScreen   = () => {
     
     try {
       console.log("Đang tìm kiếm bài kiểm tra:", searchTerm);
-      
-      // Lấy tổng số kiểm tra từ localStorage để xác định có bao nhiêu trang
       const totalCount = localStorage.getItem("totalTests") || 0;
       const maxPages = Math.ceil(Number(totalCount) / pageSize);
-      
-      // Mảng để lưu tất cả kết quả tìm kiếm
       let allResults = [];
-      
-      // API endpoint cho tìm kiếm
       const searchUrl = `http://localhost:5026/api/Quiz/search?title=${encodeURIComponent(searchTerm)}`;
       
-      // Thử gọi API tìm kiếm không phân trang (nếu có)
       try {
         const response = await axios.get(searchUrl);
         console.log("Kết quả tìm kiếm từ API không phân trang:", response.data);
-        
         if (response.data) {
           if (Array.isArray(response.data)) {
             allResults = response.data;
@@ -125,20 +104,14 @@ const OnclassSubjectScreen   = () => {
         }
       } catch (searchError) {
         console.log("API tìm kiếm không phân trang thất bại, thực hiện tìm kiếm qua từng trang");
-        
-        // Lặp qua tất cả các trang và tìm kiếm
         const searchPromises = [];
-        
         for (let page = 1; page <= maxPages; page++) {
           searchPromises.push(
             axios.get(`http://localhost:5026/api/Quiz/PageNumber?pageNumber=${page}&pageSize=${pageSize}`)
               .then(response => {
                 const quizzes = response.data.quizzes || [];
-                // Lọc bài kiểm tra phù hợp với từ khóa tìm kiếm
                 const query = searchTerm.toLowerCase();
-                return quizzes.filter(quiz => 
-                  (quiz.title && quiz.title.toLowerCase().includes(query))
-                );
+                return quizzes.filter(quiz => quiz.title && quiz.title.toLowerCase().includes(query));
               })
               .catch(error => {
                 console.error(`Lỗi khi tìm kiếm trang ${page}:`, error);
@@ -146,23 +119,15 @@ const OnclassSubjectScreen   = () => {
               })
           );
         }
-        
-        // Chờ tất cả các yêu cầu hoàn thành
         const results = await Promise.all(searchPromises);
-        
-        // Gộp tất cả kết quả
         allResults = results.flat();
       }
       
-      // Kiểm tra nếu không tìm thấy kết quả từ API, thử tìm trong localStorage
       if (allResults.length === 0) {
         console.log("Không tìm thấy kết quả từ API, thử tìm trong localStorage");
-        
         const cachedTests = localStorage.getItem("tests");
         if (cachedTests) {
           let allCachedTests = [];
-          
-          // Lặp qua tất cả các trang
           for (let page = 1; page <= maxPages; page++) {
             try {
               const pageData = localStorage.getItem(`tests_page_${page}`);
@@ -174,22 +139,17 @@ const OnclassSubjectScreen   = () => {
               console.error(`Lỗi khi đọc dữ liệu trang ${page} từ localStorage:`, error);
             }
           }
-          
-          // Nếu không có dữ liệu phân trang, sử dụng dữ liệu đã lưu trong localStorage
           if (allCachedTests.length === 0) {
             allCachedTests = JSON.parse(cachedTests);
           }
-          
           const query = searchTerm.toLowerCase();
-          allResults = allCachedTests.filter(test => 
-            (test.title && test.title.toLowerCase().includes(query))
-          );
+          allResults = allCachedTests.filter(test => test.title && test.title.toLowerCase().includes(query));
         }
       }
       
       console.log("Tổng số kết quả tìm kiếm:", allResults.length);
       setTests(allResults);
-      setTotalPages(1); // Kết quả tìm kiếm không cần phân trang
+      setTotalPages(1);
       setCurrentPage(1);
       
     } catch (error) {
@@ -211,14 +171,13 @@ const OnclassSubjectScreen   = () => {
   // Hàm format ngày tháng dạng dd/mm/yyyy
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    
     try {
       const date = new Date(dateString);
       return date.toLocaleDateString('vi-VN', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric'
-      }).replace(/\//g, '/');
+      });
     } catch (error) {
       return dateString;
     }
@@ -228,39 +187,27 @@ const OnclassSubjectScreen   = () => {
   const handlePageChange = (pageNumber) => {
     if (pageNumber < 1 || pageNumber > totalPages) return;
     setCurrentPage(pageNumber);
-    
-    // Nếu đang ở chế độ tìm kiếm, không gọi fetchTests
     if (!isSearchActive) {
       fetchTests(pageNumber);
     }
   };
   
-  // Xử lý khi người dùng nhấp vào tiêu đề bài kiểm tra
+  // Khi người dùng nhấp vào tiêu đề bài kiểm tra -> chuyển hướng đến Teststart
   const handleTestClick = (testId) => {
-    // Lưu thông tin bài kiểm tra hiện tại vào localStorage nếu cần
     const selectedTest = tests.find(test => test.id === testId);
     if (selectedTest) {
       localStorage.setItem('selectedTest', JSON.stringify(selectedTest));
     }
-    
-    // Chuyển hướng đến trang làm bài
-    navigate(`/dotest/${testId}`);
+    navigate(`/teststart/${testId}`);
   };
   
   // Hiển thị phân trang với dấu ba chấm
   const renderPagination = () => {
-    // Đảm bảo totalPages là một số hợp lệ
     const safeTotal = Math.max(1, totalPages || 1);
-
-    // Nếu chỉ có 1 trang, không hiển thị phân trang
     if (safeTotal <= 1) {
       return null;
     }
-
-    // Mảng để chứa các nút phân trang
     const items = [];
-    
-    // Luôn thêm trang đầu tiên
     items.push(
       <button
         key={1}
@@ -270,15 +217,11 @@ const OnclassSubjectScreen   = () => {
         1
       </button>
     );
-
-    // Hiển thị dấu ba chấm đầu tiên nếu cần
     if (currentPage > 4) {
       items.push(<span key="ellipsis-1" className="dots">...</span>);
     }
-
-    // Hiển thị trang xung quanh trang hiện tại
     for (let i = Math.max(2, currentPage - 2); i <= Math.min(safeTotal - 1, currentPage + 2); i++) {
-      if (i === 1 || i === safeTotal) continue; // Bỏ qua trang đầu và trang cuối vì đã hiển thị riêng
+      if (i === 1 || i === safeTotal) continue;
       items.push(
         <button
           key={i}
@@ -289,13 +232,9 @@ const OnclassSubjectScreen   = () => {
         </button>
       );
     }
-
-    // Hiển thị dấu ba chấm cuối cùng nếu cần
     if (currentPage < safeTotal - 3) {
       items.push(<span key="ellipsis-2" className="dots">...</span>);
     }
-
-    // Luôn thêm trang cuối cùng nếu có nhiều hơn 1 trang
     if (safeTotal > 1) {
       items.push(
         <button
@@ -307,7 +246,6 @@ const OnclassSubjectScreen   = () => {
         </button>
       );
     }
-
     return (
       <div className="pagination">
         <button
@@ -317,9 +255,7 @@ const OnclassSubjectScreen   = () => {
         >
           <FaChevronLeft />
         </button>
-        
         {items}
-        
         <button
           className="page-btn"
           disabled={currentPage === safeTotal}
@@ -331,16 +267,11 @@ const OnclassSubjectScreen   = () => {
     );
   };
   
-  // Xử lý khi user nhấn Enter trong ô tìm kiếm
+  // Xử lý nhấn Enter trong ô tìm kiếm
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') {
       handleSearch();
     }
-  };
-  
-  // Xử lý redirect đến trang tạo bài kiểm tra mới
-  const handleAddNew = () => {
-    window.location.href = '/addnewtest1';
   };
   
   // Kiểm tra token khi component mount
@@ -371,13 +302,13 @@ const OnclassSubjectScreen   = () => {
           <FaCog className="function-icon" />
         </div>
         <div className="function-icons">
-          <Link to="/testlist" className="icon-item">
+          <Link to="/homestudent" className="icon-item">
             <FaBook className="function-icon" />
-            <p className="icon-description">Học sinh</p>
+            <p className="icon-description">Môn học</p>
           </Link>
-          <Link to="/testliststudent" className="icon-item">
+          <Link to="/supportstudent" className="icon-item">
             <FaHeadset className="function-icon" />
-            <p className="icon-description">Bài kiểm tra</p>
+            <p className="icon-description">Hỗ trợ</p>
           </Link>
           <div className="icon-item" onClick={toggleNotifications}>
             <FaBell className="function-icon" />
@@ -401,14 +332,13 @@ const OnclassSubjectScreen   = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyPress={handleKeyPress}
-              />
-              <FaCog className="search-icon" onClick={handleSearch} />
-              {searchTerm && (
-                <FaTimes className="clear-search-icon" onClick={handleClearSearch} />
-              )}
-            </div>
-           
+            />
+            <FaCog className="search-icon" onClick={handleSearch} />
+            {searchTerm && (
+              <FaTimes className="clear-search-icon" onClick={handleClearSearch} />
+            )}
           </div>
+        </div>
 
         {isLoading ? (
           <div className="loading">Đang tải dữ liệu</div>
@@ -422,7 +352,7 @@ const OnclassSubjectScreen   = () => {
                   <th>Mô tả</th>
                   <th>Thời gian làm</th>
                   <th>Hạn nộp</th>
-                  <th>Điểm số </th>
+                  <th>Điểm số</th>
                 </tr>
               </thead>
               <tbody>
@@ -430,16 +360,18 @@ const OnclassSubjectScreen   = () => {
                   tests.map((test, index) => (
                     <tr key={index}>
                       <td>{index + 1}</td>
-                      <td className="test-title-cell" onClick={() => handleTestClick(test.id)}>{test.title || 'N/A'}</td>
+                      <td className="test-title-cell" onClick={() => handleTestClick(test.id)}>
+                        {test.title || 'N/A'}
+                      </td>
                       <td>{test.description || 'N/A'}</td>
                       <td>{test.duration ? `${test.duration} phút` : 'N/A'}</td>
                       <td>{formatDate(test.deadline)}</td>
-                      <td>{formatDate(test.deadline)}</td>
+                      <td>{test.score !== undefined ? test.score : 'N/A'}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="5" style={{ textAlign: "center" }}>
+                    <td colSpan="6" style={{ textAlign: "center" }}>
                       {isSearchActive
                         ? "Không tìm thấy bài kiểm tra nào."
                         : "Không có bài kiểm tra nào."}
