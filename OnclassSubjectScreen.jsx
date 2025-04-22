@@ -1,96 +1,101 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "./OnclassSubjectScreen.css";
-import { FaBook, FaBell, FaHeadset, FaCog, FaSignOutAlt, FaTimes, FaEllipsisV, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import {
+  FaBook,
+  FaBell,
+  FaHeadset,
+  FaCog,
+  FaSignOutAlt,
+  FaTimes,
+  FaEllipsisV,
+  FaChevronLeft,
+  FaChevronRight
+} from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
- 
+
 const OnclassSubjectScreen = () => {
   const navigate = useNavigate();
-  // State để điều khiển hiển thị thông báo
+
+  // State điều khiển hiển thị thông báo
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
- 
+
   // State cho dữ liệu bảng
   const [tests, setTests] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearchActive, setIsSearchActive] = useState(false);
- 
-  // Thêm state cho tên lớp và tên môn học
+
+  // State cho tên lớp và môn
   const [className, setClassName] = useState("");
   const [subjectName, setSubjectName] = useState("");
- 
-  // Dùng cùng pageSize với API
-  const pageSize = 10;
- 
-  // Toggle hiển thị hộp thông báo
+
+  // Toggle thông báo
   const toggleNotifications = () => {
     setShowNotifications(prev => !prev);
   };
- 
-  // Hàm lấy dữ liệu bài kiểm tra với phân trang
-  const fetchTests = async (pageNumber = 1) => {
+
+  // Hàm lấy quiz theo classId & subjectId
+  const fetchTests = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`http://localhost:5026/api/Quiz/PageNumber?pageNumber=${pageNumber}&pageSize=${pageSize}`);
-      console.log("API Quiz response:", response.data);
-     
-      if (response.data) {
-        setTests(response.data.quizzes || []);
-        const calculatedTotalPages = Math.ceil(response.data.totalCount / pageSize);
-        setTotalPages(calculatedTotalPages || 1);
-        setCurrentPage(response.data.pageNumber || 1);
-        localStorage.setItem("tests", JSON.stringify(response.data.quizzes || []));
-        localStorage.setItem("totalTests", response.data.totalCount);
-        localStorage.setItem(`tests_page_${pageNumber}`, JSON.stringify(response.data.quizzes || []));
-        setIsSearchActive(false);
+      const classId = localStorage.getItem("classId");
+      const subjectId = localStorage.getItem("SubjectId");
+      if (!classId || !subjectId) {
+        console.error("Thiếu classId hoặc subjectId trong localStorage");
+        setTests([]);
+        return;
       }
+
+      const response = await axios.get(
+        `http://localhost:5026/api/Quiz/${classId}/${subjectId}`
+      );
+      console.log("API Quiz theo Lớp-Môn:", response.data);
+
+      // Nếu backend trả về mảng, dùng luôn, nếu trả về object có quizzes thì dùng quizzes
+      const data = Array.isArray(response.data)
+        ? response.data
+        : response.data.quizzes || [];
+      setTests(data);
+
+      // Xoá trạng thái search nếu có
+      setIsSearchActive(false);
     } catch (error) {
-      console.error("Lỗi khi lấy dữ liệu bài kiểm tra:", error);
-      const cachedTests = localStorage.getItem("tests");
-      if (cachedTests) {
-        setTests(JSON.parse(cachedTests));
-        const totalCount = localStorage.getItem("totalTests") || 10;
-        setTotalPages(Math.ceil(Number(totalCount) / pageSize));
-        console.log("Đã tải dữ liệu bài kiểm tra từ localStorage");
-      }
+      console.error("Lỗi khi lấy quiz theo classId-subjectId:", error);
+      // fallback: lấy từ localStorage
+      const cached = localStorage.getItem("tests");
+      if (cached) setTests(JSON.parse(cached));
     } finally {
       setIsLoading(false);
     }
   };
- 
-  // Lấy dữ liệu thông báo
+
+  // Hàm lấy thông báo (giữ nguyên)
   const fetchNotifications = async () => {
     try {
       const response = await axios.get("http://localhost:5026/api/Notification");
-      const notificationData = response.data;
-      setNotifications(notificationData);
-      localStorage.setItem("notifications", JSON.stringify(notificationData));
+      setNotifications(response.data);
+      localStorage.setItem("notifications", JSON.stringify(response.data));
     } catch (error) {
-      console.error("Lỗi khi lấy dữ liệu thông báo:", error);
-      const cachedNotifications = localStorage.getItem("notifications");
-      if (cachedNotifications) {
-        setNotifications(JSON.parse(cachedNotifications));
-      }
+      console.error("Lỗi khi lấy thông báo:", error);
+      const cached = localStorage.getItem("notifications");
+      if (cached) setNotifications(JSON.parse(cached));
     }
   };
- 
-  // Xử lý tìm kiếm trên tất cả các trang
+
+  // Tìm kiếm (giữ nguyên logic, chỉ đổi gọi fetchTests())
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
-      fetchTests(1);
+      fetchTests();
       return;
     }
-   
     setIsLoading(true);
     setIsSearchActive(true);
-   
     try {
       console.log("Đang tìm kiếm bài kiểm tra:", searchTerm);
-      const totalCount = localStorage.getItem("totalTests") || 0;
-      const maxPages = Math.ceil(Number(totalCount) / pageSize);
+      //const totalCount = localStorage.getItem("totalTests") || 0;
+      //const maxPages = Math.ceil(Number(totalCount) / pageSize);
       let allResults = [];
       const searchUrl = `http://localhost:5026/api/Quiz/search?title=${encodeURIComponent(searchTerm)}`;
      
@@ -109,20 +114,20 @@ const OnclassSubjectScreen = () => {
       } catch (searchError) {
         console.log("API tìm kiếm không phân trang thất bại, thực hiện tìm kiếm qua từng trang");
         const searchPromises = [];
-        for (let page = 1; page <= maxPages; page++) {
-          searchPromises.push(
-            axios.get(`http://localhost:5026/api/Quiz/PageNumber?pageNumber=${page}&pageSize=${pageSize}`)
-              .then(response => {
-                const quizzes = response.data.quizzes || [];
-                const query = searchTerm.toLowerCase();
-                return quizzes.filter(quiz => quiz.title && quiz.title.toLowerCase().includes(query));
-              })
-              .catch(error => {
-                console.error(`Lỗi khi tìm kiếm trang ${page}:`, error);
-                return [];
-              })
-          );
-        }
+        // for (let page = 1; page <= maxPages; page++) {
+        //   searchPromises.push(
+        //     axios.get(`http://localhost:5026/api/Quiz/PageNumber?pageNumber=${page}&pageSize=${pageSize}`)
+        //       .then(response => {
+        //         const quizzes = response.data.quizzes || [];
+        //         const query = searchTerm.toLowerCase();
+        //         return quizzes.filter(quiz => quiz.title && quiz.title.toLowerCase().includes(query));
+        //       })
+        //       .catch(error => {
+        //         console.error(`Lỗi khi tìm kiếm trang ${page}:`, error);
+        //         return [];
+        //       })
+        //   );
+        // }
         const results = await Promise.all(searchPromises);
         allResults = results.flat();
       }
@@ -132,17 +137,17 @@ const OnclassSubjectScreen = () => {
         const cachedTests = localStorage.getItem("tests");
         if (cachedTests) {
           let allCachedTests = [];
-          for (let page = 1; page <= maxPages; page++) {
-            try {
-              const pageData = localStorage.getItem(`tests_page_${page}`);
-              if (pageData) {
-                const parsedData = JSON.parse(pageData);
-                allCachedTests = [...allCachedTests, ...parsedData];
-              }
-            } catch (error) {
-              console.error(`Lỗi khi đọc dữ liệu trang ${page} từ localStorage:`, error);
-            }
-          }
+          // for (let page = 1; page <= maxPages; page++) {
+          //   try {
+          //     const pageData = localStorage.getItem(`tests_page_${page}`);
+          //     if (pageData) {
+          //       const parsedData = JSON.parse(pageData);
+          //       allCachedTests = [...allCachedTests, ...parsedData];
+          //     }
+          //   } catch (error) {
+          //     console.error(`Lỗi khi đọc dữ liệu trang ${page} từ localStorage:`, error);
+          //   }
+          // }
           if (allCachedTests.length === 0) {
             allCachedTests = JSON.parse(cachedTests);
           }
@@ -153,182 +158,76 @@ const OnclassSubjectScreen = () => {
      
       console.log("Tổng số kết quả tìm kiếm:", allResults.length);
       setTests(allResults);
-      setTotalPages(1);
-      setCurrentPage(1);
+      //setTotalPages(1);
+      //setCurrentPage(1);
      
     } catch (error) {
       console.error("Lỗi khi tìm kiếm bài kiểm tra:", error);
       setTests([]);
-      setTotalPages(1);
+      //setTotalPages(1);
     } finally {
       setIsLoading(false);
     }
   };
- 
-  // Xử lý xóa tìm kiếm
+
   const handleClearSearch = () => {
     setSearchTerm("");
-    fetchTests(1);
+    fetchTests();
     setIsSearchActive(false);
   };
- 
-  // Hàm format ngày tháng dạng dd/mm/yyyy
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
+
+  const formatDate = DateTime => {
+    if (!DateTime) return "N/A";
     try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('vi-VN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
+      const date = new Date(DateTime);
+      return date.toLocaleDateString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
       });
-    } catch (error) {
-      return dateString;
+    } catch {
+      return DateTime;
     }
   };
- 
-  // Kiểm tra xem bài kiểm tra có còn hạn hay không
-  const isTestActive = (dueDate) => {
+
+  const isTestActive = dueDate => {
     if (!dueDate) return false;
-    try {
-      const testDueDate = new Date(dueDate);
-      const currentDate = new Date();
-     
-      // Đặt giờ, phút, giây về 0 để so sánh ngày
-      testDueDate.setHours(23, 59, 59, 999);
-      currentDate.setHours(0, 0, 0, 0);
-     
-      return testDueDate >= currentDate;
-    } catch (error) {
-      console.error("Lỗi khi kiểm tra trạng thái test:", error);
-      return false;
-    }
+    const testDue = new Date(dueDate);
+    const now = new Date();
+    testDue.setHours(23, 59, 59, 999);
+    now.setHours(0, 0, 0, 0);
+    return testDue >= now;
   };
- 
-  // Xử lý khi người dùng thay đổi trang
-  const handlePageChange = (pageNumber) => {
-    if (pageNumber < 1 || pageNumber > totalPages) return;
-    setCurrentPage(pageNumber);
-    if (!isSearchActive) {
-      fetchTests(pageNumber);
-    }
-  };
- 
-  // Khi người dùng nhấp vào tiêu đề bài kiểm tra -> chuyển hướng đến Teststart
-  const handleTestClick = (testId) => {
-    const selectedTest = tests.find(test => test.id === testId);
-    if (selectedTest) {
-      localStorage.setItem('selectedTest', JSON.stringify(selectedTest));
-    }
+
+  const handleTestClick = testId => {
+    const sel = tests.find(t => t.id === testId);
+    if (sel) localStorage.setItem("selectedTest", JSON.stringify(sel));
     navigate(`/teststart/${testId}`);
   };
- 
-  // Hiển thị phân trang với dấu ba chấm
-  const renderPagination = () => {
-    const safeTotal = Math.max(1, totalPages || 1);
-    if (safeTotal <= 1) {
-      return null;
-    }
-    const items = [];
-    items.push(
-      <button
-        key={1}
-        className={`page-btn ${currentPage === 1 ? "active" : ""}`}
-        onClick={() => handlePageChange(1)}
-      >
-        1
-      </button>
-    );
-    if (currentPage > 4) {
-      items.push(<span key="ellipsis-1" className="dots">...</span>);
-    }
-    for (let i = Math.max(2, currentPage - 2); i <= Math.min(safeTotal - 1, currentPage + 2); i++) {
-      if (i === 1 || i === safeTotal) continue;
-      items.push(
-        <button
-          key={i}
-          className={`page-btn ${currentPage === i ? "active" : ""}`}
-          onClick={() => handlePageChange(i)}
-        >
-          {i}
-        </button>
-      );
-    }
-    if (currentPage < safeTotal - 3) {
-      items.push(<span key="ellipsis-2" className="dots">...</span>);
-    }
-    if (safeTotal > 1) {
-      items.push(
-        <button
-          key={safeTotal}
-          className={`page-btn ${currentPage === safeTotal ? "active" : ""}`}
-          onClick={() => handlePageChange(safeTotal)}
-        >
-          {safeTotal}
-        </button>
-      );
-    }
-    return (
-      <div className="pagination">
-        <button
-          className="page-btn"
-          disabled={currentPage === 1}
-          onClick={() => handlePageChange(currentPage - 1)}
-        >
-          <FaChevronLeft />
-        </button>
-        {items}
-        <button
-          className="page-btn"
-          disabled={currentPage === safeTotal}
-          onClick={() => handlePageChange(currentPage + 1)}
-        >
-          <FaChevronRight />
-        </button>
-      </div>
-    );
-  };
- 
-  // Xử lý nhấn Enter trong ô tìm kiếm
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
-  };
- 
-  // Kiểm tra token khi component mount
+
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
+    const token = localStorage.getItem("accessToken");
     if (!token) {
-      navigate('/login');
+      navigate("/login");
       return;
     }
-   
-    // Thiết lập token cho mọi request axios
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-   
-    // Lấy tên môn học và tên lớp từ localStorage
-    const savedSubjectName = localStorage.getItem("selectedSubjectName");
+    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+    // Lấy tên lớp & môn để hiển thị
     const savedClassName = localStorage.getItem("className");
-   
-    if (savedSubjectName) {
-      setSubjectName(savedSubjectName);
-    }
-   
-    if (savedClassName) {
-      setClassName(savedClassName);
-    }
-   
-    fetchTests(1);
+    const savedSubjectName = localStorage.getItem("selectedSubjectName");
+    if (savedClassName) setClassName(savedClassName);
+    if (savedSubjectName) setSubjectName(savedSubjectName);
+
+    fetchTests();
     fetchNotifications();
   }, [navigate]);
- 
-  // Xử lý đăng xuất
+
   const handleLogout = () => {
-    localStorage.removeItem('accessToken');
-    navigate('/login');
+    localStorage.removeItem("accessToken");
+    navigate("/login");
   };
- 
+
   return (
     <div className="testslist-body">
       <div className="sidebar">
@@ -357,27 +256,31 @@ const OnclassSubjectScreen = () => {
           </div>
         </div>
       </div>
- 
+
       <div className="main-contentteacher">
         <div className="headerteacher">
-          {/* Hiển thị tên lớp và tên môn học trong title */}
-          <h1 className="title5">{className} - Kho đề {subjectName}</h1>
+          <h1 className="title5">
+            {className} - Kho đề {subjectName}
+          </h1>
           <div className="search-wrapper">
             <input
               type="text"
               className="search-input"
               placeholder="Tìm kiếm bài kiểm tra..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onChange={e => setSearchTerm(e.target.value)}
+              onKeyPress={e => e.key === "Enter" && handleSearch()}
             />
             <FaCog className="search-icon" onClick={handleSearch} />
             {searchTerm && (
-              <FaTimes className="clear-search-icon" onClick={handleClearSearch} />
+              <FaTimes
+                className="clear-search-icon"
+                onClick={handleClearSearch}
+              />
             )}
           </div>
         </div>
- 
+
         {isLoading ? (
           <div className="loading">Đang tải dữ liệu</div>
         ) : (
@@ -396,34 +299,45 @@ const OnclassSubjectScreen = () => {
               </thead>
               <tbody>
                 {tests.length > 0 ? (
-                  tests.map((test, index) => {
+                  tests.map((test, idx) => {
                     const active = isTestActive(test.dueDate);
-                    const statusColor = active ? "#41D052" : "#8E0505";
-                    const statusText = active ? "Còn hạn" : "Hết hạn";
-                   
                     return (
-                      <tr key={test.id} onClick={() => handleTestClick(test.id)} style={{ cursor: 'pointer' }}>
-                        <td>{index + 1}</td>
-                        <td style={{ color: statusColor, fontWeight: 'bold' }}>{statusText}</td>
+                      <tr
+                        key={test.id}
+                        onClick={() => handleTestClick(test.id)}
+                        style={{ cursor: "pointer" }}
+                      >
+                        <td>{idx + 1}</td>
+                        <td
+                          style={{
+                            color: active ? "#41D052" : "#8E0505",
+                            fontWeight: "bold"
+                          }}
+                        >
+                          {active ? "Còn hạn" : "Hết hạn"}
+                        </td>
                         <td>{test.title}</td>
                         <td>{formatDate(test.dueDate)}</td>
                         <td>{test.timeLimit || test.duration || 0} phút</td>
-                        <td>{test.questionCount || test.questions?.length || 0}</td>
+                        <td>
+                          {test.questionCount || test.questions?.length || 0}
+                        </td>
                         <td>{test.maxScore || 10}</td>
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
-                    <td colSpan="7" className="empty-row">Không có bài kiểm tra</td>
+                    <td colSpan="7" className="empty-row">
+                      Không có bài kiểm tra
+                    </td>
                   </tr>
                 )}
               </tbody>
             </table>
-            {!isSearchActive && renderPagination()}
           </div>
         )}
- 
+
         {showNotifications && (
           <div className="notification-box show">
             <div className="notification-header">
@@ -432,12 +346,14 @@ const OnclassSubjectScreen = () => {
             </div>
             <div className="notification-content">
               {notifications.length > 0 ? (
-                notifications.map((item, index) => (
-                  <div className="notification-item" key={index}>
+                notifications.map((item, i) => (
+                  <div className="notification-item" key={i}>
                     <div className="notification-text">
                       <strong>{item.title || item.name || "Thông báo"}</strong>
                       <p>{item.message || item.content || ""}</p>
-                      <small>{item.time || formatDate(item.createdAt) || ""}</small>
+                      <small>
+                        {item.time || formatDate(item.createdAt) || ""}
+                      </small>
                     </div>
                     <FaEllipsisV className="notification-options" />
                   </div>
@@ -452,6 +368,5 @@ const OnclassSubjectScreen = () => {
     </div>
   );
 };
- 
+
 export default OnclassSubjectScreen;
- 
