@@ -3,36 +3,40 @@ import axios from "axios";
 import "./OnclassSubjectScreen.css";
 import { FaBook, FaBell, FaHeadset, FaCog, FaSignOutAlt, FaTimes, FaEllipsisV, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
-
+ 
 const OnclassSubjectScreen = () => {
   const navigate = useNavigate();
   // State để điều khiển hiển thị thông báo
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  
+ 
   // State cho dữ liệu bảng
   const [tests, setTests] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearchActive, setIsSearchActive] = useState(false);
-  
+ 
+  // Thêm state cho tên lớp và tên môn học
+  const [className, setClassName] = useState("");
+  const [subjectName, setSubjectName] = useState("");
+ 
   // Dùng cùng pageSize với API
   const pageSize = 10;
-  
+ 
   // Toggle hiển thị hộp thông báo
   const toggleNotifications = () => {
     setShowNotifications(prev => !prev);
   };
-  
+ 
   // Hàm lấy dữ liệu bài kiểm tra với phân trang
   const fetchTests = async (pageNumber = 1) => {
     setIsLoading(true);
     try {
       const response = await axios.get(`http://localhost:5026/api/Quiz/PageNumber?pageNumber=${pageNumber}&pageSize=${pageSize}`);
       console.log("API Quiz response:", response.data);
-      
+     
       if (response.data) {
         setTests(response.data.quizzes || []);
         const calculatedTotalPages = Math.ceil(response.data.totalCount / pageSize);
@@ -56,7 +60,7 @@ const OnclassSubjectScreen = () => {
       setIsLoading(false);
     }
   };
-  
+ 
   // Lấy dữ liệu thông báo
   const fetchNotifications = async () => {
     try {
@@ -72,24 +76,24 @@ const OnclassSubjectScreen = () => {
       }
     }
   };
-  
+ 
   // Xử lý tìm kiếm trên tất cả các trang
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
       fetchTests(1);
       return;
     }
-    
+   
     setIsLoading(true);
     setIsSearchActive(true);
-    
+   
     try {
       console.log("Đang tìm kiếm bài kiểm tra:", searchTerm);
       const totalCount = localStorage.getItem("totalTests") || 0;
       const maxPages = Math.ceil(Number(totalCount) / pageSize);
       let allResults = [];
       const searchUrl = `http://localhost:5026/api/Quiz/search?title=${encodeURIComponent(searchTerm)}`;
-      
+     
       try {
         const response = await axios.get(searchUrl);
         console.log("Kết quả tìm kiếm từ API không phân trang:", response.data);
@@ -122,7 +126,7 @@ const OnclassSubjectScreen = () => {
         const results = await Promise.all(searchPromises);
         allResults = results.flat();
       }
-      
+     
       if (allResults.length === 0) {
         console.log("Không tìm thấy kết quả từ API, thử tìm trong localStorage");
         const cachedTests = localStorage.getItem("tests");
@@ -146,12 +150,12 @@ const OnclassSubjectScreen = () => {
           allResults = allCachedTests.filter(test => test.title && test.title.toLowerCase().includes(query));
         }
       }
-      
+     
       console.log("Tổng số kết quả tìm kiếm:", allResults.length);
       setTests(allResults);
       setTotalPages(1);
       setCurrentPage(1);
-      
+     
     } catch (error) {
       console.error("Lỗi khi tìm kiếm bài kiểm tra:", error);
       setTests([]);
@@ -160,14 +164,14 @@ const OnclassSubjectScreen = () => {
       setIsLoading(false);
     }
   };
-  
+ 
   // Xử lý xóa tìm kiếm
   const handleClearSearch = () => {
     setSearchTerm("");
     fetchTests(1);
     setIsSearchActive(false);
   };
-  
+ 
   // Hàm format ngày tháng dạng dd/mm/yyyy
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -182,7 +186,25 @@ const OnclassSubjectScreen = () => {
       return dateString;
     }
   };
-  
+ 
+  // Kiểm tra xem bài kiểm tra có còn hạn hay không
+  const isTestActive = (dueDate) => {
+    if (!dueDate) return false;
+    try {
+      const testDueDate = new Date(dueDate);
+      const currentDate = new Date();
+     
+      // Đặt giờ, phút, giây về 0 để so sánh ngày
+      testDueDate.setHours(23, 59, 59, 999);
+      currentDate.setHours(0, 0, 0, 0);
+     
+      return testDueDate >= currentDate;
+    } catch (error) {
+      console.error("Lỗi khi kiểm tra trạng thái test:", error);
+      return false;
+    }
+  };
+ 
   // Xử lý khi người dùng thay đổi trang
   const handlePageChange = (pageNumber) => {
     if (pageNumber < 1 || pageNumber > totalPages) return;
@@ -191,7 +213,7 @@ const OnclassSubjectScreen = () => {
       fetchTests(pageNumber);
     }
   };
-  
+ 
   // Khi người dùng nhấp vào tiêu đề bài kiểm tra -> chuyển hướng đến Teststart
   const handleTestClick = (testId) => {
     const selectedTest = tests.find(test => test.id === testId);
@@ -200,7 +222,7 @@ const OnclassSubjectScreen = () => {
     }
     navigate(`/teststart/${testId}`);
   };
-  
+ 
   // Hiển thị phân trang với dấu ba chấm
   const renderPagination = () => {
     const safeTotal = Math.max(1, totalPages || 1);
@@ -266,32 +288,47 @@ const OnclassSubjectScreen = () => {
       </div>
     );
   };
-  
+ 
   // Xử lý nhấn Enter trong ô tìm kiếm
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') {
       handleSearch();
     }
   };
-  
+ 
   // Kiểm tra token khi component mount
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
     if (!token) {
       navigate('/login');
-    } else {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      fetchTests(1);
-      fetchNotifications();
+      return;
     }
+   
+    // Thiết lập token cho mọi request axios
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+   
+    // Lấy tên môn học và tên lớp từ localStorage
+    const savedSubjectName = localStorage.getItem("selectedSubjectName");
+    const savedClassName = localStorage.getItem("className");
+   
+    if (savedSubjectName) {
+      setSubjectName(savedSubjectName);
+    }
+   
+    if (savedClassName) {
+      setClassName(savedClassName);
+    }
+   
+    fetchTests(1);
+    fetchNotifications();
   }, [navigate]);
-  
+ 
   // Xử lý đăng xuất
   const handleLogout = () => {
     localStorage.removeItem('accessToken');
     navigate('/login');
   };
-  
+ 
   return (
     <div className="testslist-body">
       <div className="sidebar">
@@ -320,10 +357,11 @@ const OnclassSubjectScreen = () => {
           </div>
         </div>
       </div>
-
+ 
       <div className="main-contentteacher">
         <div className="headerteacher">
-          <h1 className="title5">Kho Đề</h1>
+          {/* Hiển thị tên lớp và tên môn học trong title */}
+          <h1 className="title5">{className} - Kho đề {subjectName}</h1>
           <div className="search-wrapper">
             <input
               type="text"
@@ -339,7 +377,7 @@ const OnclassSubjectScreen = () => {
             )}
           </div>
         </div>
-
+ 
         {isLoading ? (
           <div className="loading">Đang tải dữ liệu</div>
         ) : (
@@ -348,70 +386,72 @@ const OnclassSubjectScreen = () => {
               <thead>
                 <tr>
                   <th>STT</th>
+                  <th>Tình trạng</th>
                   <th>Tiêu đề</th>
-                  <th>Mô tả</th>
-                  <th>Thời gian làm</th>
-                  <th>Hạn nộp</th>
+                  <th>Ngày hết hạn</th>
+                  <th>Thời gian làm bài</th>
+                  <th>Số câu</th>
                   <th>Điểm số</th>
                 </tr>
               </thead>
               <tbody>
                 {tests.length > 0 ? (
-                  tests.map((test, index) => (
-                    <tr key={index}>
-                      <td>{index + 1}</td>
-                      <td className="test-title-cell" onClick={() => handleTestClick(test.id)}>
-                        {test.title || 'N/A'}
-                      </td>
-                      <td>{test.description || 'N/A'}</td>
-                      <td>{test.duration ? `${test.duration} phút` : 'N/A'}</td>
-                      <td>{formatDate(test.deadline)}</td>
-                      <td>{test.score !== undefined ? test.score : 'N/A'}</td>
-                    </tr>
-                  ))
+                  tests.map((test, index) => {
+                    const active = isTestActive(test.dueDate);
+                    const statusColor = active ? "#41D052" : "#8E0505";
+                    const statusText = active ? "Còn hạn" : "Hết hạn";
+                   
+                    return (
+                      <tr key={test.id} onClick={() => handleTestClick(test.id)} style={{ cursor: 'pointer' }}>
+                        <td>{index + 1}</td>
+                        <td style={{ color: statusColor, fontWeight: 'bold' }}>{statusText}</td>
+                        <td>{test.title}</td>
+                        <td>{formatDate(test.dueDate)}</td>
+                        <td>{test.timeLimit || test.duration || 0} phút</td>
+                        <td>{test.questionCount || test.questions?.length || 0}</td>
+                        <td>{test.maxScore || 10}</td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
-                    <td colSpan="6" style={{ textAlign: "center" }}>
-                      {isSearchActive
-                        ? "Không tìm thấy bài kiểm tra nào."
-                        : "Không có bài kiểm tra nào."}
-                    </td>
+                    <td colSpan="7" className="empty-row">Không có bài kiểm tra</td>
                   </tr>
                 )}
               </tbody>
             </table>
+            {!isSearchActive && renderPagination()}
           </div>
         )}
-
-        {/* Phân trang */}
-        {!isSearchActive && tests.length > 0 && renderPagination()}
-
-        {/* Hộp Thông Báo */}
-        <div className={`notification-box ${showNotifications ? "show" : "hide"}`}>
-          <div className="notification-header">
-            <span>Thông Báo</span>
-            <FaTimes className="close-btn" onClick={toggleNotifications} />
-          </div>
-          <div className="notification-content">
-            {notifications.length > 0 ? (
-              notifications.map((item, index) => (
-                <div className="notification-item" key={index}>
-                  <span className="user-icon"></span>
-                  <div className="notification-text">
-                    <strong>{item.name || item.context}</strong>
-                    <p>{item.message || item.time}</p>
+ 
+        {showNotifications && (
+          <div className="notification-box show">
+            <div className="notification-header">
+              <span>Thông Báo</span>
+              <FaTimes className="close-btn" onClick={toggleNotifications} />
+            </div>
+            <div className="notification-content">
+              {notifications.length > 0 ? (
+                notifications.map((item, index) => (
+                  <div className="notification-item" key={index}>
+                    <div className="notification-text">
+                      <strong>{item.title || item.name || "Thông báo"}</strong>
+                      <p>{item.message || item.content || ""}</p>
+                      <small>{item.time || formatDate(item.createdAt) || ""}</small>
+                    </div>
+                    <FaEllipsisV className="notification-options" />
                   </div>
-                  <FaEllipsisV className="notification-options" />
-                </div>
-              ))
-            ) : (
-              <div className="no-notifications">Không có thông báo</div>
-            )}
+                ))
+              ) : (
+                <div className="no-notifications">Không có thông báo</div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
 };
-
+ 
 export default OnclassSubjectScreen;
+ 
